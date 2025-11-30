@@ -2,6 +2,15 @@
 
 This project implements a Model Context Protocol (MCP) server that integrates with The Movie Database (TMDB) API. It enables AI assistants like Claude to interact with movie data, providing capabilities for searching, retrieving details, and generating content related to movies.
 
+## Transport Modes
+
+This server supports two transport modes:
+
+| Mode | Command | Use Case |
+|------|---------|----------|
+| **stdio** | `npm start` | Claude Desktop, VS Code Copilot, MCP Inspector (default) |
+| **Streamable HTTP** | `npm run start:http` | Remote clients, web apps, Flask backends |
+
 ## Features
 
 ### Resources
@@ -32,8 +41,7 @@ This project implements a Model Context Protocol (MCP) server that integrates wi
 
 1. Clone this repository
    ```
-   git clone https://github.com/your-username/tmdb-mcp.git
-   cd tmdb-mcp
+   git clone https://github.com/mpelossi/tmdb-mcp.git   cd tmdb-mcp
    ```
 
 2. Install dependencies
@@ -54,6 +62,20 @@ This project implements a Model Context Protocol (MCP) server that integrates wi
    ```
    npm start
    ```
+
+### Running with Streamable HTTP Transport
+
+For remote connections or web-based clients, use the HTTP transport:
+
+```bash
+npm run start:http
+```
+
+This starts the server at `http://localhost:3001/mcp` with the following endpoints:
+- `POST /mcp` - Send JSON-RPC messages
+- `GET /mcp` - SSE stream for server-to-client messages
+- `DELETE /mcp` - Terminate session
+- `GET /health` - Health check
 
 ### Setup for Claude Desktop
 
@@ -105,9 +127,13 @@ This project implements a Model Context Protocol (MCP) server that integrates wi
 ```
 tmdb-mcp/
 ├── src/
-│   ├── index.ts                # Main server file
+│   ├── index.ts                # stdio transport server
+│   ├── index-streamable.ts     # Streamable HTTP transport server
 │   ├── config.ts               # Configuration and API keys
-│   ├── handlers.ts             # Request handlers
+│   ├── handlers.ts             # Request handlers (stdio)
+│   ├── register-tools.ts       # Tool registration (HTTP)
+│   ├── register-resources.ts   # Resource registration (HTTP)
+│   ├── register-prompts.ts     # Prompt registration (HTTP)
 │   ├── resources.ts            # Static resources
 │   ├── resource-templates.ts   # Dynamic resource templates
 │   ├── prompts.ts              # Prompt definitions
@@ -122,9 +148,48 @@ tmdb-mcp/
 
 Use the MCP Inspector to test your server during development:
 
-```
+#### Testing stdio transport (default)
+```bash
 npx @modelcontextprotocol/inspector node build/index.js
 ```
+
+#### Testing Streamable HTTP transport
+
+1. Start the HTTP server in one terminal:
+   ```bash
+   npm run dev:http
+   ```
+
+2. In another terminal, connect the inspector:
+   ```bash
+   npx @modelcontextprotocol/inspector --url http://localhost:3001/mcp
+   ```
+
+Alternatively, run `npx @modelcontextprotocol/inspector` and in the UI:
+1. Select **"Streamable HTTP"** as the transport type
+2. Enter URL: `http://localhost:3001/mcp`
+3. Click **Connect**
+
+### Connecting from a Python/Flask App
+
+You can connect to the Streamable HTTP server from Python using the MCP SDK:
+
+```python
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+async with streamablehttp_client("http://localhost:3001/mcp") as (read, write, _):
+    async with ClientSession(read, write) as session:
+        await session.initialize()
+        
+        # List available tools
+        tools = await session.list_tools()
+        
+        # Call a tool
+        result = await session.call_tool("search-movies", {"query": "inception"})
+```
+
+Install the MCP Python SDK: `pip install mcp`
 
 ## License
 
